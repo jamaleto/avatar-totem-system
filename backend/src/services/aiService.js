@@ -9,8 +9,10 @@ const REPLICATE_MODEL_VERSION =
   "11219f80ba03ca1ce78194191ffa4fc74f7c1afeef50df95f477aa66f2f65bc5";
 
 // Mesma proporção de impressão usada na captura da foto (retrato).
-const OUTPUT_WIDTH = 1024;
-const OUTPUT_HEIGHT = 1536;
+// Resolução mais moderada = geração mais rápida (o modelo já faz upscale
+// razoável na impressão; não precisa gerar em altíssima resolução).
+const OUTPUT_WIDTH = 768;
+const OUTPUT_HEIGHT = 1152;
 
 async function runReplicate({ apiToken, imageBase64, prompt }) {
   const createRes = await fetch("https://api.replicate.com/v1/predictions", {
@@ -28,8 +30,7 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
         negative_prompt: "",
         width: OUTPUT_WIDTH,
         height: OUTPUT_HEIGHT,
-        // Menos passos = mais rápido, com leve perda de detalhe fino
-        num_inference_steps: 18,
+        num_inference_steps: 20,
         guidance_scale: 5,
         ip_adapter_scale: 0.8,
         controlnet_conditioning_scale: 0.8,
@@ -44,14 +45,16 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
 
   let prediction = await createRes.json();
 
+  // O backend roda no Railway (servidor normal, sem limite de tempo por
+  // requisição), então podemos esperar bem mais que numa função serverless.
   let attempts = 0;
   while (
     prediction.status !== "succeeded" &&
     prediction.status !== "failed" &&
     prediction.status !== "canceled" &&
-    attempts < 40
+    attempts < 90
   ) {
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 2000));
     const pollRes = await fetch(prediction.urls.get, {
       headers: { Authorization: `Token ${apiToken}` },
     });
