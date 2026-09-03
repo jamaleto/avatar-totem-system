@@ -3,10 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
 
-// Modelo InstantID no Replicate — preserva o rosto da foto original.
-// Se quiser trocar de versão, veja replicate.com/zsxkib/instant-id
-const REPLICATE_MODEL_VERSION =
-  "11219f80ba03ca1ce78194191ffa4fc74f7c1afeef50df95f477aa66f2f65bc5";
+// Deployment dedicado no Replicate (GPU sempre ligada, sem fila).
+// Criado em replicate.com/deployments — veja README para instruções de
+// como criar/desligar.
+const REPLICATE_DEPLOYMENT = "jamaleto/avatar-totem";
 
 // Mesma proporção de impressão usada na captura da foto (retrato).
 // Resolução mais moderada = geração mais rápida (o modelo já faz upscale
@@ -15,28 +15,30 @@ const OUTPUT_WIDTH = 768;
 const OUTPUT_HEIGHT = 1152;
 
 async function runReplicate({ apiToken, imageBase64, prompt }) {
-  const createRes = await fetch("https://api.replicate.com/v1/predictions", {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${apiToken}`,
-      "Content-Type": "application/json",
-      Prefer: "wait=55",
-    },
-    body: JSON.stringify({
-      version: REPLICATE_MODEL_VERSION,
-      input: {
-        image: imageBase64,
-        prompt,
-        negative_prompt: "",
-        width: OUTPUT_WIDTH,
-        height: OUTPUT_HEIGHT,
-        num_inference_steps: 20,
-        guidance_scale: 5,
-        ip_adapter_scale: 0.8,
-        controlnet_conditioning_scale: 0.8,
+  const createRes = await fetch(
+    `https://api.replicate.com/v1/deployments/${REPLICATE_DEPLOYMENT}/predictions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiToken}`,
+        "Content-Type": "application/json",
+        Prefer: "wait=30",
       },
-    }),
-  });
+      body: JSON.stringify({
+        input: {
+          image: imageBase64,
+          prompt,
+          negative_prompt: "",
+          width: OUTPUT_WIDTH,
+          height: OUTPUT_HEIGHT,
+          num_inference_steps: 20,
+          guidance_scale: 5,
+          ip_adapter_scale: 0.8,
+          controlnet_conditioning_scale: 0.8,
+        },
+      }),
+    }
+  );
 
   if (!createRes.ok) {
     const errText = await createRes.text();
@@ -45,16 +47,17 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
 
   let prediction = await createRes.json();
 
-  // O backend roda no Railway (servidor normal, sem limite de tempo por
-  // requisição), então podemos esperar bem mais que numa função serverless.
+  // Com o deployment dedicado (GPU sempre ligada), isso deve ser bem
+  // rápido — poucos segundos, não minutos. Mantemos alguma margem só
+  // por segurança.
   let attempts = 0;
   while (
     prediction.status !== "succeeded" &&
     prediction.status !== "failed" &&
     prediction.status !== "canceled" &&
-    attempts < 90
+    attempts < 40
   ) {
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1500));
     const pollRes = await fetch(prediction.urls.get, {
       headers: { Authorization: `Token ${apiToken}` },
     });
