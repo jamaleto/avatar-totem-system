@@ -8,6 +8,10 @@ import { config } from "../config.js";
 const REPLICATE_MODEL_VERSION =
   "11219f80ba03ca1ce78194191ffa4fc74f7c1afeef50df95f477aa66f2f65bc5";
 
+// Mesma proporção de impressão usada na captura da foto (retrato).
+const OUTPUT_WIDTH = 1024;
+const OUTPUT_HEIGHT = 1536;
+
 async function runReplicate({ apiToken, imageBase64, prompt }) {
   const createRes = await fetch("https://api.replicate.com/v1/predictions", {
     method: "POST",
@@ -22,7 +26,10 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
         image: imageBase64,
         prompt,
         negative_prompt: "",
-        num_inference_steps: 30,
+        width: OUTPUT_WIDTH,
+        height: OUTPUT_HEIGHT,
+        // Menos passos = mais rápido, com leve perda de detalhe fino
+        num_inference_steps: 18,
         guidance_scale: 5,
         ip_adapter_scale: 0.8,
         controlnet_conditioning_scale: 0.8,
