@@ -1,0 +1,20 @@
+{
+  "name": "avatar-totem-backend",
+  "version": "1.0.0",
+  "description": "Backend do sistema de avatar por IA integrado ao credenciamento",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "lowdb": "^7.0.1",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.0.7",
+    "node-fetch": "^3.3.2"
+  }
+}
