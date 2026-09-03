@@ -1,6 +1,7 @@
 import { Router } from "express";
-import multer from "multer";
 import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 import { nanoid } from "nanoid";
 import { generateAvatar, AVATAR_STYLES } from "../services/aiService.js";
 import { associarAvatarAoVisitante } from "../services/credenciamentoService.js";
@@ -8,30 +9,34 @@ import { logSession } from "../db.js";
 
 export const generateRouter = Router();
 
-const upload = multer({ dest: "/tmp/avatar-totem-uploads" });
-
 // GET /api/generate/styles — lista os estilos disponíveis para o
 // frontend montar as opções na tela de seleção.
 generateRouter.get("/styles", (req, res) => {
   res.json(AVATAR_STYLES.map(({ id, label }) => ({ id, label })));
 });
 
-// POST /api/generate — recebe a foto (multipart/form-data, campo "photo")
-// + styleId + dados do visitante, gera o avatar e grava a sessão.
-generateRouter.post("/", upload.single("photo"), async (req, res) => {
-  const { styleId, visitanteId, nome } = req.body;
+// POST /api/generate — recebe a foto em base64 (JSON) + styleId + dados
+// do visitante, gera o avatar e grava a sessão.
+generateRouter.post("/", async (req, res) => {
+  const { imageBase64, styleId, visitanteId, nome } = req.body || {};
   const sessionId = nanoid(8);
 
-  if (!req.file) {
-    return res.status(400).json({ error: "Nenhuma foto enviada" });
+  if (!imageBase64) {
+    return res.status(400).json({ error: "imageBase64 é obrigatório" });
   }
   if (!styleId) {
     return res.status(400).json({ error: "styleId é obrigatório" });
   }
 
+  // Grava a foto recebida (data URL base64) num arquivo temporário, para
+  // reaproveitar a mesma função de geração usada em qualquer contexto.
+  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+  const tempPhotoPath = path.join(os.tmpdir(), `upload_${sessionId}.jpg`);
+  await fs.writeFile(tempPhotoPath, Buffer.from(base64Data, "base64"));
+
   try {
     const result = await generateAvatar({
-      photoPath: req.file.path,
+      photoPath: tempPhotoPath,
       styleId,
     });
 
@@ -59,7 +64,6 @@ generateRouter.post("/", upload.single("photo"), async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
-    // limpa o arquivo temporário da foto original
-    await fs.unlink(req.file.path).catch(() => {});
+    await fs.unlink(tempPhotoPath).catch(() => {});
   }
 });
