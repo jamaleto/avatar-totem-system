@@ -4,10 +4,8 @@ import path from "node:path";
 export const config = {
   port: process.env.PORT || 3001,
 
-  fal: {
-    apiKey: process.env.FAL_API_KEY || "",
-    modelEndpoint:
-      process.env.FAL_MODEL_ENDPOINT || "https://fal.run/fal-ai/instant-id",
+  replicate: {
+    apiToken: process.env.REPLICATE_API_TOKEN || "",
   },
 
   print: {
@@ -25,9 +23,9 @@ export const config = {
 
 export function checkConfig() {
   const warnings = [];
-  if (!config.fal.apiKey) {
+  if (!config.replicate.apiToken) {
     warnings.push(
-      "FAL_API_KEY não configurada — a geração de avatar vai falhar até você preencher o .env"
+      "REPLICATE_API_TOKEN não configurado — a geração de avatar vai falhar até você preencher o .env"
     );
   }
   if (!config.credenciamento.baseUrl) {

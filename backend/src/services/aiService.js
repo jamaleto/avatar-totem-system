@@ -3,6 +3,72 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
 
+// Modelo InstantID no Replicate — preserva o rosto da foto original.
+// Se quiser trocar de versão, veja replicate.com/zsxkib/instant-id
+const REPLICATE_MODEL_VERSION =
+  "11219f80ba03ca1ce78194191ffa4fc74f7c1afeef50df95f477aa66f2f65bc5";
+
+async function runReplicate({ apiToken, imageBase64, prompt }) {
+  const createRes = await fetch("https://api.replicate.com/v1/predictions", {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${apiToken}`,
+      "Content-Type": "application/json",
+      Prefer: "wait=55",
+    },
+    body: JSON.stringify({
+      version: REPLICATE_MODEL_VERSION,
+      input: {
+        image: imageBase64,
+        prompt,
+        negative_prompt: "",
+        num_inference_steps: 30,
+        guidance_scale: 5,
+        ip_adapter_scale: 0.8,
+        controlnet_conditioning_scale: 0.8,
+      },
+    }),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Falha ao criar predição (${createRes.status}): ${errText}`);
+  }
+
+  let prediction = await createRes.json();
+
+  let attempts = 0;
+  while (
+    prediction.status !== "succeeded" &&
+    prediction.status !== "failed" &&
+    prediction.status !== "canceled" &&
+    attempts < 40
+  ) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const pollRes = await fetch(prediction.urls.get, {
+      headers: { Authorization: `Token ${apiToken}` },
+    });
+    prediction = await pollRes.json();
+    attempts += 1;
+  }
+
+  if (prediction.status !== "succeeded") {
+    throw new Error(
+      `Geração falhou (status: ${prediction.status}): ${prediction.error || "sem detalhes"}`
+    );
+  }
+
+  const generatedUrl = Array.isArray(prediction.output)
+    ? prediction.output[0]
+    : prediction.output;
+
+  if (!generatedUrl) {
+    throw new Error("O Replicate não retornou uma imagem gerada");
+  }
+
+  return generatedUrl;
+}
+
 /**
  * Estilos de avatar disponíveis no totem.
  * Cada estilo é um prompt fixo — isso mantém a geração consistente
@@ -37,22 +103,18 @@ export const AVATAR_STYLES = [
 ];
 
 /**
- * Gera o avatar chamando o endpoint da fal.ai.
+ * Gera o avatar chamando o modelo InstantID no Replicate.
  * Recebe o caminho local da foto capturada e o id do estilo escolhido.
  * Retorna o caminho local do arquivo gerado.
- *
- * IMPORTANTE: o slug do modelo (`config.fal.modelEndpoint`) e o formato
- * exato do payload podem mudar — confira sempre a doc atual do modelo
- * escolhido em https://fal.ai/models antes de ir para produção.
  */
 export async function generateAvatar({ photoPath, styleId }) {
   const style = AVATAR_STYLES.find((s) => s.id === styleId);
   if (!style) {
     throw new Error(`Estilo de avatar desconhecido: ${styleId}`);
   }
-  if (!config.fal.apiKey) {
+  if (!config.replicate.apiToken) {
     throw new Error(
-      "FAL_API_KEY não configurada no .env — veja .env.example"
+      "REPLICATE_API_TOKEN não configurado no .env — veja .env.example"
     );
   }
 
@@ -61,39 +123,11 @@ export async function generateAvatar({ photoPath, styleId }) {
     "base64"
   )}`;
 
-  const response = await fetch(config.fal.modelEndpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${config.fal.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      image_url: imageBase64,
-      prompt: style.prompt,
-      // Parâmetros comuns em modelos de identidade preservada (InstantID/PhotoMaker).
-      // Nomes de campo variam por modelo — ajuste conforme a doc do modelo escolhido.
-      identity_strength: 0.8,
-      num_inference_steps: 25,
-      guidance_scale: 5,
-    }),
+  const generatedUrl = await runReplicate({
+    apiToken: config.replicate.apiToken,
+    imageBase64,
+    prompt: style.prompt,
   });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(
-      `Falha na geração de avatar (${response.status}): ${errText}`
-    );
-  }
-
-  const result = await response.json();
-
-  // A maioria dos modelos fal.ai retorna { images: [{ url: "..." }] }
-  const generatedUrl = result?.images?.[0]?.url;
-  if (!generatedUrl) {
-    throw new Error(
-      "Resposta da IA não trouxe uma imagem gerada — verifique o formato de retorno do modelo escolhido"
-    );
-  }
 
   const imgResponse = await fetch(generatedUrl);
   const imgArrayBuffer = await imgResponse.arrayBuffer();
