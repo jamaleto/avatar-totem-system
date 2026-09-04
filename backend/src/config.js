@@ -18,6 +18,8 @@ export const config = {
     apiKey: process.env.CREDENCIAMENTO_API_KEY || "",
   },
 
+  adminPassword: process.env.ADMIN_PASSWORD || "",
+
   outputDir: path.resolve(process.env.OUTPUT_DIR || "./data/avatars"),
 };
 
@@ -31,6 +33,11 @@ export function checkConfig() {
   if (!config.credenciamento.baseUrl) {
     warnings.push(
       "CREDENCIAMENTO_API_URL não configurada — o totem vai rodar em modo standalone, sem puxar/gravar dados do seu sistema de credenciamento"
+    );
+  }
+  if (!config.adminPassword) {
+    warnings.push(
+      "ADMIN_PASSWORD não configurada — o painel administrativo (/admin) vai ficar inacessível até você definir uma senha"
     );
   }
   return warnings;

@@ -4,6 +4,7 @@ import { config, checkConfig } from "./config.js";
 import { checkinRouter } from "./routes/checkin.js";
 import { generateRouter } from "./routes/generate.js";
 import { printRouter } from "./routes/print.js";
+import { adminRouter } from "./routes/admin.js";
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use("/avatars", express.static(config.outputDir));
 app.use("/api/checkin", checkinRouter);
 app.use("/api/generate", generateRouter);
 app.use("/api/print", printRouter);
+app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", warnings: checkConfig() });

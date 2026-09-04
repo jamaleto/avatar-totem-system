@@ -87,47 +87,14 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
 }
 
 /**
- * Estilos de avatar disponíveis no totem.
- * Cada estilo é um prompt fixo — isso mantém a geração consistente
- * e evita que o visitante precise digitar qualquer coisa.
- * Ajuste/expanda livremente para os estilos do seu evento.
- */
-export const AVATAR_STYLES = [
-  {
-    id: "cyberpunk",
-    label: "Cyberpunk",
-    prompt:
-      "cyberpunk portrait, neon lights, futuristic city background, digital art, high detail, cinematic lighting",
-  },
-  {
-    id: "classico",
-    label: "Retrato Clássico",
-    prompt:
-      "professional studio portrait, soft lighting, elegant background, high detail, photorealistic",
-  },
-  {
-    id: "aquarela",
-    label: "Aquarela",
-    prompt:
-      "watercolor painting portrait, soft brush strokes, pastel colors, artistic, delicate",
-  },
-  {
-    id: "heroi",
-    label: "Herói",
-    prompt:
-      "comic book superhero style portrait, bold colors, dynamic pose, dramatic lighting",
-  },
-];
-
-/**
  * Gera o avatar chamando o modelo InstantID no Replicate.
- * Recebe o caminho local da foto capturada e o id do estilo escolhido.
- * Retorna o caminho local do arquivo gerado.
+ * Recebe o caminho local da foto capturada e o PROMPT já resolvido
+ * (a lista de estilos/prompts agora vive em services/stylesStore.js,
+ * editável pelo painel administrativo).
  */
-export async function generateAvatar({ photoPath, styleId }) {
-  const style = AVATAR_STYLES.find((s) => s.id === styleId);
-  if (!style) {
-    throw new Error(`Estilo de avatar desconhecido: ${styleId}`);
+export async function generateAvatar({ photoPath, prompt }) {
+  if (!prompt) {
+    throw new Error("prompt é obrigatório");
   }
   if (!config.replicate.apiToken) {
     throw new Error(
@@ -143,7 +110,7 @@ export async function generateAvatar({ photoPath, styleId }) {
   const generatedUrl = await runReplicate({
     apiToken: config.replicate.apiToken,
     imageBase64,
-    prompt: style.prompt,
+    prompt,
   });
 
   const imgResponse = await fetch(generatedUrl);
@@ -154,5 +121,5 @@ export async function generateAvatar({ photoPath, styleId }) {
   const outputPath = path.join(config.outputDir, filename);
   await fs.writeFile(outputPath, Buffer.from(imgArrayBuffer));
 
-  return { outputPath, filename, styleUsed: style.label };
+  return { outputPath, filename };
 }

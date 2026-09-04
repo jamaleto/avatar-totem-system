@@ -1,33 +1,30 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { config } from "../config.js";
+import { getPrinterSettings } from "./settingsStore.js";
 
 const execAsync = promisify(exec);
 
 /**
- * Envia o arquivo para impressão.
+ * Envia o arquivo para impressão. A configuração (modo/nome da
+ * impressora) agora vem do settingsStore, editável em tempo real pelo
+ * painel administrativo (/admin), sem precisar redeployar o backend.
  *
  * modo "cups": usa o comando `lp` (padrão em Linux e macOS) para mandar o
- * arquivo para a impressora configurada no sistema operacional. Isso
- * funciona bem com a maioria das impressoras fotográficas dye-sub
- * (DNP, Mitsubishi) desde que o driver do fabricante já esteja instalado
- * e a impressora configurada como impressora do sistema.
+ * arquivo para a impressora configurada no sistema operacional.
  *
  * modo "none": não imprime, só confirma que o arquivo existe — útil
- * para testar o fluxo sem ter a impressora fisicamente conectada.
- *
- * Se sua impressora tiver um SDK próprio (comum em modelos DNP/Mitsubishi
- * de alto volume), troque esta função pela chamada ao SDK do fabricante.
+ * para testar o fluxo sem ter a impressora fisicamente conectada, ou
+ * quando rodando na nuvem (onde não existe impressora nenhuma).
  */
 export async function printAvatar(filePath) {
-  if (config.print.mode === "none") {
+  const { printMode, printerName } = getPrinterSettings();
+
+  if (printMode === "none") {
     return { printed: false, message: "PRINT_MODE=none — impressão simulada" };
   }
 
-  if (config.print.mode === "cups") {
-    const printerFlag = config.print.printerName
-      ? `-d "${config.print.printerName}"`
-      : "";
+  if (printMode === "cups") {
+    const printerFlag = printerName ? `-d "${printerName}"` : "";
     const cmd = `lp ${printerFlag} "${filePath}"`;
     try {
       const { stdout } = await execAsync(cmd);
@@ -37,5 +34,5 @@ export async function printAvatar(filePath) {
     }
   }
 
-  throw new Error(`PRINT_MODE desconhecido: ${config.print.mode}`);
+  throw new Error(`PRINT_MODE desconhecido: ${printMode}`);
 }
