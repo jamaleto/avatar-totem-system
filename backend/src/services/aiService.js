@@ -31,7 +31,11 @@ async function runReplicate({ apiToken, imageBase64, prompt }) {
           negative_prompt: "",
           width: OUTPUT_WIDTH,
           height: OUTPUT_HEIGHT,
-          num_inference_steps: 20,
+          // Modo LCM: gera em bem menos passos (rápido), troca um pouco
+          // de nitidez fina por velocidade — ótimo pra retrato de rosto.
+          enable_lcm: true,
+          lcm_num_inference_steps: 6,
+          lcm_guidance_scale: 1.5,
           guidance_scale: 5,
           ip_adapter_scale: 0.8,
           controlnet_conditioning_scale: 0.8,
