@@ -1,8 +1,10 @@
 import { JSONFilePreset } from "lowdb/node";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
 
 const dbFile = path.join(config.outputDir, "..", "styles.json");
+await fs.mkdir(path.dirname(dbFile), { recursive: true });
 
 const defaultData = {
   styles: [
